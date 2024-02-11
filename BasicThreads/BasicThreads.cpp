@@ -1,51 +1,81 @@
-// BasicThreads.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
 #include <thread>
-#include <chrono>
 #include <mutex>
+#include <string>
+#include <vector>
 
+using namespace std;
 
-void basic_print_string()
+mutex myMutex;
+
+class stack
 {
-    std::cout << "inside of basic_print_string" << std::endl;
+public:
+    stack() {};
+    ~stack() {};
+    void pop();
+    int top() { return data.back(); }
+    void push(int);
+    void print();
+    int getSize() { return data.size(); }
+private:
+    vector<int> data;
+};
+
+void stack::pop()
+{
+    lock_guard<mutex> guard(myMutex);
+    data.erase(data.end() - 1);
 }
 
-
-void print_string(std::string test)
+void stack::push(int n)
 {
-    std::cout << "PRINTING STRING : " << test << std::endl << std::flush;
+    lock_guard<mutex> guard(myMutex);
+    data.push_back(n);
 }
 
-void print_name(std::string name_string)
+void stack::print()
 {
-    std::cout << "Name in thread is " << name_string << std::endl;
+    cout << "initial stack : ";
+    for (int item : data)
+        cout << item << " ";
+    cout << endl;
 }
 
-std::mutex thread_mutex{};
-
-void add_one_to_number(int &num)
+void process(int val, string s)
 {
-    std::lock_guard<std::mutex> guard(thread_mutex);
-    std::cout << "num1 in func before inc is " << num << std::endl;
-    ++num;
-    std::cout << "num1 in func after inc is " << num << std::endl;
+    lock_guard<mutex> guard(myMutex);
+    cout << s << " : " << val << endl;
+}
+
+void thread_function(stack &st, string s)
+{
+    int val = st.top();
+    st.pop();
+    process(val, s);
 }
 
 int main()
 {
-    int num1 = 10;
-    std::cout << "num1 in main is " << num1 << std::endl;
-    std::thread worker1(add_one_to_number, std::ref(num1));
+    stack st;
+    for (int i = 0; i < 10; i++)  st.push(i);
 
-    {
-        std::lock_guard<std::mutex> guard(thread_mutex);
-        std::cout << "num1 in main before inc is  " << num1 << std::endl;
-        ++num1;
+    st.print();
+
+    while (true) {
+        if (st.getSize() > 0) {
+            thread t1(&thread_function, ref(st), string("thread1"));
+            t1.join();
+        }
+        else
+            break;
+        if (st.getSize() > 0) {
+            thread t2(&thread_function, ref(st), string("thread2"));
+            t2.join();
+        }
+        else
+            break;
     }
 
-    worker1.join();
-    std::cout << "num1 at end of main is " << num1 << std::endl;
+    return 0;
 }
-
